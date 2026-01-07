@@ -13,7 +13,8 @@ import { Animated } from "react-native";
 WebBrowser.maybeCompleteAuthSession();
 
 // 🔴 CHANGE this to your backend IP
-const BACKEND_URL = "http://192.168.0.5:8080";
+const BACKEND_URL = "https://dev-moveservices.mroads.com";
+
 
 export default function Login() {
   const router = useRouter();
@@ -127,6 +128,7 @@ const animateOut = (anim: Animated.Value) => {
   ]}
 >
   <TextInput
+    placeholderTextColor="#9CA3AF"
     placeholder="Phone number or Email"
     style={styles.animatedInput}
     value={identifier}
@@ -159,6 +161,7 @@ const animateOut = (anim: Animated.Value) => {
 >
   <View style={styles.passwordRow}>
     <TextInput
+      placeholderTextColor="#9CA3AF"
       placeholder="Password"
       style={styles.passwordInput}
       secureTextEntry={!showPassword}
@@ -376,6 +379,7 @@ const styles = StyleSheet.create({
 animatedInput: {
   padding: 14,
   fontSize: 16,
+  color: "#111827",
 },
 
 passwordRow: {
@@ -388,6 +392,7 @@ passwordInput: {
   flex: 1,
   paddingVertical: 14,
   fontSize: 16,
+  color: "#111827",
 },
 
 

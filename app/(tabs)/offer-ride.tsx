@@ -134,6 +134,7 @@ function VehicleStep({
       </View>
 
       <TextInput
+      placeholderTextColor="#9CA3AF"
         placeholder="Your name"
         value={name}
         onChangeText={setName}
@@ -143,6 +144,7 @@ function VehicleStep({
       <View style={styles.phoneRow}>
         <Text style={styles.countryCode}>🇮🇳 +91</Text>
         <TextInput
+        placeholderTextColor="#9CA3AF"
           placeholder="Mobile number"
           keyboardType="number-pad"
           value={phone}
@@ -152,6 +154,7 @@ function VehicleStep({
       </View>
 
       <TextInput
+      placeholderTextColor="#9CA3AF"
         placeholder="Vehicle registration number"
         value={vehicleNumber}
         onChangeText={setVehicleNumber}
@@ -257,6 +260,7 @@ function RouteStep({
 
       {/* FROM (AUTO) */}
       <TextInput
+      placeholderTextColor="#9CA3AF"
         value={fromLocation}
         editable={false}
         style={[styles.input, { backgroundColor: "#F9FAFB" }]}
@@ -264,6 +268,7 @@ function RouteStep({
 
       {/* TO */}
       <TextInput
+      placeholderTextColor="#9CA3AF"
         placeholder="Set drop location"
         value={toLocation}
         onChangeText={resolveToLocation}

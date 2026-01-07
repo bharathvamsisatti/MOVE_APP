@@ -5,6 +5,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { registerUser } from "../services/auth";
 import { Ionicons } from "@expo/vector-icons";
 import LoadingOverlay from "../components/LoadingOverlay";
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
+
+WebBrowser.maybeCompleteAuthSession();
+
+// 🔴 CHANGE ONLY IF BACKEND URL CHANGES
+const BACKEND_URL = "https://dev-moveservices.mroads.com";
 
 export default function Register() {
   const router = useRouter();
@@ -15,7 +22,7 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   const isValid =
@@ -24,6 +31,9 @@ export default function Register() {
     password.length >= 6 &&
     password === confirmPassword;
 
+  /* =========================
+     EMAIL / PASSWORD REGISTER
+     ========================= */
   const handleRegister = async () => {
     try {
       setLoading(true);
@@ -31,15 +41,44 @@ export default function Register() {
 
       await registerUser({ userName, email, password });
 
-      setSuccess(true);
+      setSuccess("Account created successfully. Redirecting to login…");
 
       setTimeout(() => {
-        router.replace("/login"); // ✅ manual login after register
-      }, 3000);
+        router.replace("/login");
+      }, 2000);
     } catch (e: any) {
       setError(e.message || "Registration failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  /* =========================
+     GOOGLE SIGNUP / LOGIN
+     ========================= */
+  const handleGoogleSignup = async () => {
+    try {
+      setError("");
+      setSuccess("");
+
+      const redirectUri = Linking.createURL("oauth");
+
+      const authUrl =
+        `${BACKEND_URL}/oauth2/authorization/google` +
+        `?redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+      await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+
+      // ✅ Backend handles:
+      // - existing user → login
+      // - new user → create + login
+      // Token handling happens in /oauth screen
+
+      setSuccess(
+        "No account found with this email. We’ve created one for you and signed you in."
+      );
+    } catch (e) {
+      setError("Google signup failed. Please try again.");
     }
   };
 
@@ -55,8 +94,10 @@ export default function Register() {
           Join MOVE and start traveling smarter
         </Text>
 
+        {/* -------- Email Signup -------- */}
         <TextInput
           placeholder="Full name"
+          placeholderTextColor="#9CA3AF"
           style={styles.input}
           value={userName}
           onChangeText={setUserName}
@@ -64,6 +105,7 @@ export default function Register() {
 
         <TextInput
           placeholder="Email"
+          placeholderTextColor="#9CA3AF"
           style={styles.input}
           value={email}
           onChangeText={setEmail}
@@ -73,6 +115,7 @@ export default function Register() {
         <View style={styles.passwordWrapper}>
           <TextInput
             placeholder="Password"
+            placeholderTextColor="#9CA3AF"
             style={styles.passwordInput}
             secureTextEntry={!showPassword}
             value={password}
@@ -89,20 +132,18 @@ export default function Register() {
 
         <TextInput
           placeholder="Confirm password"
+          placeholderTextColor="#9CA3AF"
           style={styles.input}
           secureTextEntry={!showPassword}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
         />
 
-        {success && (
-          <Text style={styles.success}>
-            ✅ Account created successfully! Redirecting to login…
-          </Text>
-        )}
-
+        {/* -------- Messages -------- */}
+        {success ? <Text style={styles.success}>{success}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
+        {/* -------- Create Account -------- */}
         <Pressable
           style={[
             styles.primaryBtn,
@@ -116,6 +157,20 @@ export default function Register() {
           </Text>
         </Pressable>
 
+        {/* -------- Divider -------- */}
+        <View style={styles.divider}>
+          <View style={styles.line} />
+          <Text style={styles.or}>OR</Text>
+          <View style={styles.line} />
+        </View>
+
+        {/* -------- Google Signup -------- */}
+        <Pressable style={styles.googleBtn} onPress={handleGoogleSignup}>
+          <Ionicons name="logo-google" size={18} color="#DB4437" />
+          <Text style={styles.googleText}>Continue with Google</Text>
+        </Pressable>
+
+        {/* -------- Footer -------- */}
         <Pressable onPress={() => router.back()}>
           <Text style={styles.footerText}>
             Already have an account?{" "}
@@ -129,6 +184,9 @@ export default function Register() {
   );
 }
 
+/* =========================
+   STYLES
+   ========================= */
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#fff" },
   header: { paddingHorizontal: 24, paddingTop: 12 },
@@ -159,6 +217,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 14,
     fontSize: 16,
+    color: "#111827",
   },
 
   passwordWrapper: {
@@ -175,6 +234,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     fontSize: 16,
+    color: "#111827",
   },
 
   success: {
@@ -193,7 +253,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 10,
     marginTop: 10,
-    marginBottom: 20,
+    marginBottom: 18,
   },
 
   disabledBtn: {
@@ -205,6 +265,41 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 16,
     fontWeight: "600",
+  },
+
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 18,
+  },
+
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#E5E7EB",
+  },
+
+  or: {
+    marginHorizontal: 10,
+    color: "#6B7280",
+    fontSize: 12,
+  },
+
+  googleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 18,
+  },
+
+  googleText: {
+    marginLeft: 10,
+    fontWeight: "600",
+    color: "#111827",
   },
 
   footerText: {

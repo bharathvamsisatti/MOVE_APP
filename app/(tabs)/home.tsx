@@ -52,13 +52,30 @@ export default function Home() {
   };
 
   const loadLocation = async () => {
+  try {
     const loc = await Location.getCurrentPositionAsync({});
     const geo = await Location.reverseGeocodeAsync(loc.coords);
+
+    if (!geo || geo.length === 0) {
+      setCity("Your location");
+      return;
+    }
+
     const place = geo[0];
-    const cityName = place.city || place.subregion || "Your location";
+    const cityName =
+      place.city ||
+      place.subregion ||
+      place.region ||
+      "Your location";
+
     setCity(cityName);
     setFrom(cityName);
-  };
+  } catch (err) {
+    console.log("Location error:", err);
+    setCity("Your location");
+  }
+};
+
 
   const shakeGift = () => {
     Animated.sequence([
@@ -143,6 +160,7 @@ export default function Home() {
         <View style={styles.inputWrapper}>
           <Ionicons name="radio-button-on" size={14} color="#22C55E" />
           <TextInput
+          placeholderTextColor="#9CA3AF"
             placeholder="From"
             value={from}
             onChangeText={setFrom}
@@ -153,6 +171,7 @@ export default function Home() {
         <View style={styles.inputWrapper}>
           <Ionicons name="location" size={16} color="#EF4444" />
           <TextInput
+          placeholderTextColor="#9CA3AF"
             placeholder="To"
             value={to}
             onChangeText={setTo}
@@ -161,6 +180,7 @@ export default function Home() {
         </View>
 
         <Pressable
+        disabled={!from || !to}
           style={[
             styles.searchBtn,
             (!from || !to) && { opacity: 0.6 },
@@ -286,6 +306,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     flex: 1,
     fontSize: 16,
+    color: "#111827",
   },
 
   searchBtn: {

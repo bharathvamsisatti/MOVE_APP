@@ -1,4 +1,4 @@
-import { SafeAreaView, View, Text, StatusBar } from "react-native";
+import { SafeAreaView, View, Text, } from "react-native";
 import { useEffect } from "react";
 import { useRouter } from "expo-router";
 import LottieView from "lottie-react-native";
@@ -10,7 +10,7 @@ export default function Splash() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.replace("/welcome");
+      router.replace("/");
 
     }, 2000);
 

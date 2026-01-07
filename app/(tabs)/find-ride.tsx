@@ -186,6 +186,7 @@ export default function FindRide() {
             <Ionicons name="radio-button-on" size={16} color="#22C55E" />
             <TextInput
               placeholder="From"
+              placeholderTextColor="#9CA3AF"
               value={from}
               onChangeText={setFrom}
               style={styles.input}
@@ -196,6 +197,7 @@ export default function FindRide() {
           <View style={styles.inputRow}>
             <Ionicons name="location" size={18} color="#EF4444" />
             <TextInput
+            placeholderTextColor="#9CA3AF"
               placeholder="To"
               value={to}
               onChangeText={setTo}
@@ -229,6 +231,7 @@ export default function FindRide() {
 
           {/* SEARCH BUTTON */}
           <Pressable
+          disabled={loading}
             style={[
               styles.searchBtn,
               (!from || !to) && { opacity: 0.6 },
@@ -504,6 +507,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 16,
     flex: 1,
+    color: "#111827"
   },
 
   dateRow: {
