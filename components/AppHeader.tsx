@@ -5,9 +5,10 @@ import { useRef, useState } from "react";
 type Props = {
   location?: string | null;
   onPressLocation?: () => void;
+  onBack?: () => void;
 };
 
-export default function AppHeader({ location, onPressLocation }: Props) {
+export default function AppHeader({ location, onPressLocation, onBack }: Props) {
   const shake = useRef(new Animated.Value(0)).current;
   const [showGift, setShowGift] = useState(false);
 
@@ -21,23 +22,28 @@ export default function AppHeader({ location, onPressLocation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Logo + Location */}
-      <View>
-        <Text style={styles.logo}>MOVE</Text>
+      {/* Left: Back (optional) + Logo + Location */}
+      <View style={styles.leftRow}>
+        {onBack && (
+          <Pressable onPress={onBack} style={styles.backBtn} accessibilityLabel="Back">
+            <Ionicons name="arrow-back" size={20} color="#1E40AF" />
+          </Pressable>
+        )}
 
-        <Pressable
-          style={styles.locationPill}
-          onPress={onPressLocation}
-        >
-          <Ionicons name="location-outline" size={14} color="#1E40AF" />
-          <Text style={styles.locationText}>
-            {location || "Enable location"}
-          </Text>
-        </Pressable>
+        <View>
+          <Text style={styles.logo}>MOVE</Text>
+
+          <Pressable style={styles.locationPill} onPress={onPressLocation}>
+            <Ionicons name="location-outline" size={14} color="#1E40AF" />
+            <Text style={styles.locationText}>
+              {location || "Enable location"}
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Gift */}
-      <Pressable onPress={shakeGift}>
+      <Pressable onPress={shakeGift} accessibilityLabel="Gift">
         <Animated.View
           style={{
             transform: [
@@ -45,7 +51,7 @@ export default function AppHeader({ location, onPressLocation }: Props) {
                 rotate: shake.interpolate({
                   inputRange: [-20, 20],
                   outputRange: ["-20deg", "20deg"],
-                }),
+                }) as any,
               },
             ],
           }}
@@ -63,6 +69,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingBottom: 14,
+  },
+
+  leftRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  backBtn: {
+    marginRight: 10,
+    padding: 6,
+    borderRadius: 8,
   },
 
   logo: {

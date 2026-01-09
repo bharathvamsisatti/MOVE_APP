@@ -8,6 +8,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Alert,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -48,6 +50,10 @@ const parseDepartureToDate = (time?: string) => {
   return d;
 };
 
+/* ---------- New shared normalizer (add near helpers) ---------- */
+const normalizeInput = (text: string) => text.trim().replace(/\s+/g, " ");
+/* -------------------------------------------------------------- */
+
 type SortType =
   | "PRICE_LOW"
   | "PRICE_HIGH"
@@ -63,6 +69,11 @@ export default function FindRide() {
   const [to, setTo] = useState((toParam as string) || "");
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
+
+  // NEW: suggestion states + geocode loading
+  const [fromSuggestions, setFromSuggestions] = useState<any[]>([]);
+  const [toSuggestions, setToSuggestions] = useState<any[]>([]);
+  const [geoLoading, setGeoLoading] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any[]>([]);
@@ -98,22 +109,87 @@ export default function FindRide() {
     return scored.sort((a, b) => b._score - a._score)[0];
   };
 
-  const onSearch = async () => {
-    if (!from || !to || !token) return;
+  /* ---------- Suggestion fetcher (Nominatim) ---------- */
+  const fetchSuggestions = async (query: string, type: "FROM" | "TO") => {
+    const clean = normalizeInput(query);
+    if (clean.length < 3) {
+      if (type === "FROM") setFromSuggestions([]);
+      else setToSuggestions([]);
+      return;
+    }
 
     try {
+      setGeoLoading(true);
+
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+          clean
+        )}&format=json&limit=5`,
+        {
+          headers: {
+            "User-Agent": "MOVE-App/1.0",
+          },
+        }
+      );
+
+      const data = await res.json();
+
+      if (Array.isArray(data)) {
+        if (type === "FROM") setFromSuggestions(data);
+        else setToSuggestions(data);
+      }
+    } catch (e) {
+      console.log("Nominatim error", e);
+    } finally {
+      setGeoLoading(false);
+    }
+  };
+  /* ---------------------------------------------------- */
+
+  /* ---------- FIXED onSearch: normalize inputs, prevent empty calls, guard loading ---------- */
+  const onSearch = async () => {
+    const fromClean = normalizeInput(from);
+    const toClean = normalizeInput(to);
+
+    // prevent double taps / concurrent searches
+    if (loading) return;
+
+    if (!fromClean || !toClean) {
+      Alert.alert("Missing info", "Please enter both From and To locations");
+      return;
+    }
+
+    if (!token) {
+      // defensive: ensure auth token present
+      Alert.alert("Authentication required", "Please sign in to search rides.");
+      return;
+    }
+
+    try {
+      // dismiss keyboard for cleaner UX
+      Keyboard.dismiss();
+
+      // CLOSE suggestions to avoid overlap with results
+      setFromSuggestions([]);
+      setToSuggestions([]);
+
       setLoading(true);
       setHasSearched(true);
       setResults([]);
 
-      const data = await searchRides({
-        departure: from,
-        destination: to,
+      // sync UI with normalized values
+      setFrom(fromClean);
+      setTo(toClean);
+
+      // defensive: ensure API returns array or fallback to empty array
+      const apiResponse = await searchRides({
+        departure: fromClean,
+        destination: toClean,
         date,
         token,
       });
+      const data = Array.isArray(apiResponse) ? apiResponse : apiResponse || [];
 
-      // Compute MOVE Pick and put it first (frontend-only)
       const bestRide = getMovePick(data);
 
       if (bestRide) {
@@ -121,18 +197,26 @@ export default function FindRide() {
           r.id === bestRide.id ? { ...r, _isMovePick: true } : { ...r, _isMovePick: false }
         );
 
-        // ensure best ride is first
-        const ordered = [marked.find((m: any) => m._isMovePick), ...marked.filter((m: any) => !m._isMovePick)];
+        const ordered = [
+          marked.find((m: any) => m._isMovePick),
+          ...marked.filter((m: any) => !m._isMovePick),
+        ];
+
         setResults(ordered as any[]);
       } else {
         setResults(data);
       }
     } catch (e) {
       console.log(e);
+      Alert.alert("Search failed", "Something went wrong while searching. Please try again.");
     } finally {
       setLoading(false);
     }
   };
+  /* --------------------------------------------------------------------------- */
+
+  // NOTE: removed the keyboardDidHide listener that used to clear suggestions.
+  // Clearing suggestions is handled explicitly when the user taps results / searches.
 
   // Sorting derived results but keep MOVE Pick on top
   const sortedResults = [...results].sort((a, b) => {
@@ -182,27 +266,81 @@ export default function FindRide() {
           </View>
 
           {/* FROM */}
-          <View style={styles.inputRow}>
-            <Ionicons name="radio-button-on" size={16} color="#22C55E" />
-            <TextInput
-              placeholder="From"
-              placeholderTextColor="#9CA3AF"
-              value={from}
-              onChangeText={setFrom}
-              style={styles.input}
-            />
+          <View>
+            <View style={styles.inputRow}>
+              <Ionicons name="radio-button-on" size={16} color="#22C55E" />
+              <TextInput
+                placeholder="From"
+                placeholderTextColor="#9CA3AF"
+                value={from}
+                onChangeText={(text) => {
+                  setFrom(text);
+                  fetchSuggestions(text, "FROM");
+                }}
+                onBlur={() => setFrom(normalizeInput(from))} // optional polish: auto-trim on blur
+                style={styles.input}
+              />
+            </View>
+
+            {/* FROM suggestions */}
+            {fromSuggestions.length > 0 && (
+              <View style={styles.suggestionsBox}>
+                {fromSuggestions.map((item) => (
+                  <Pressable
+                    key={item.place_id}
+                    onPress={() => {
+                      // apply state first, then dismiss keyboard to avoid race with keyboardDidHide
+                      setFrom(normalizeInput(item.display_name));
+                      setFromSuggestions([]);
+
+                      // dismiss after state update/render
+                      requestAnimationFrame(() => Keyboard.dismiss());
+                    }}
+                    style={styles.suggestionItem}
+                  >
+                    <Text numberOfLines={2}>{item.display_name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* TO */}
-          <View style={styles.inputRow}>
-            <Ionicons name="location" size={18} color="#EF4444" />
-            <TextInput
-            placeholderTextColor="#9CA3AF"
-              placeholder="To"
-              value={to}
-              onChangeText={setTo}
-              style={styles.input}
-            />
+          <View>
+            <View style={styles.inputRow}>
+              <Ionicons name="location" size={18} color="#EF4444" />
+              <TextInput
+                placeholderTextColor="#9CA3AF"
+                placeholder="To"
+                value={to}
+                onChangeText={(text) => {
+                  setTo(text);
+                  fetchSuggestions(text, "TO");
+                }}
+                onBlur={() => setTo(normalizeInput(to))} // optional polish: auto-trim on blur
+                style={styles.input}
+              />
+            </View>
+
+            {/* TO suggestions */}
+            {toSuggestions.length > 0 && (
+              <View style={styles.suggestionsBox}>
+                {toSuggestions.map((item) => (
+                  <Pressable
+                    key={item.place_id}
+                    onPress={() => {
+                      setTo(normalizeInput(item.display_name));
+                      setToSuggestions([]);
+
+                      requestAnimationFrame(() => Keyboard.dismiss());
+                    }}
+                    style={styles.suggestionItem}
+                  >
+                    <Text numberOfLines={2}>{item.display_name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* DATE */}
@@ -231,14 +369,16 @@ export default function FindRide() {
 
           {/* SEARCH BUTTON */}
           <Pressable
-          disabled={loading}
+            disabled={loading || !from.trim() || !to.trim()}
             style={[
               styles.searchBtn,
-              (!from || !to) && { opacity: 0.6 },
+              (!from.trim() || !to.trim() || loading) && { opacity: 0.6 },
             ]}
             onPress={onSearch}
           >
-            <Text style={styles.searchText}>Search rides</Text>
+            <Text style={styles.searchText}>
+              {loading ? "Searching…" : "Search rides"}
+            </Text>
           </Pressable>
         </View>
 
@@ -267,8 +407,9 @@ export default function FindRide() {
                 key={i}
                 style={styles.route}
                 onPress={() => {
-                  setFrom(r[0]);
-                  setTo(r[1]);
+                  // auto-trim popular route values
+                  setFrom(normalizeInput(r[0]));
+                  setTo(normalizeInput(r[1]));
                 }}
               >
                 <Ionicons name="trending-up" size={16} color="#1E40AF" />
@@ -281,7 +422,7 @@ export default function FindRide() {
         )}
 
         {/* LOADING */}
-        {loading && <ActivityIndicator style={{ marginTop: 30 }} />}
+        {(loading || geoLoading) && <ActivityIndicator style={{ marginTop: 30 }} />}
 
         {/* EMPTY STATE */}
         {hasSearched && !loading && results.length === 0 && (
@@ -346,14 +487,14 @@ export default function FindRide() {
                   style={styles.city}
                   numberOfLines={1}
                 >
-                  {String(r.departureLocation || r.departure || from).split(",")[0]}
+                  {normalizeInput(String(r.departureLocation || r.departure || from)).split(",")[0]}
                 </Text>
                 <Ionicons name="arrow-forward" size={14} color="#6B7280" style={{ marginHorizontal: 6 }} />
                 <Text
                   style={styles.city}
                   numberOfLines={1}
                 >
-                  {String(r.destinationLocation || r.destination || to).split(",")[0]}
+                  {normalizeInput(String(r.destinationLocation || r.destination || to)).split(",")[0]}
                 </Text>
               </View>
 
@@ -621,6 +762,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6B7280",
     textAlign: "center",
+  },
+
+  // suggestions - positioned to avoid overlapping search button on small screens
+  suggestionsBox: {
+    position: "absolute",
+    top: 56,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    maxHeight: 200,
+  },
+  suggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
 
   // Filter button
