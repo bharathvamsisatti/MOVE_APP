@@ -61,7 +61,7 @@ const animateOut = (anim: Animated.Value) => {
       });
 
       await login(token, { email: identifier });
-      router.replace("/"); // go through index auth gate
+      router.replace("/(tabs)/home"); // go through index auth gate
     } catch (e) {
       setError("Invalid login details");
     }

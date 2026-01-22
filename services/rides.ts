@@ -211,3 +211,36 @@ export async function getBookingsForRide(token: string, rideId: number) {
 
   return response.json();
 }
+// =======================
+// BOOK RIDE
+// =======================
+export async function bookRide(
+  token: string,
+  rideId: number,
+  booking: {
+    passengerName: string;
+    phoneNumber: string;
+    seatsBooked: number;
+  }
+) {
+  const response = await fetch(`${API_BASE_URL}/api/rides/book/${rideId}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(booking),
+  });
+
+  if (response.status === 401) {
+    throw new Error("SESSION_EXPIRED");
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    console.log("BOOK RIDE ERROR:", text);
+    throw new Error(text || "FAILED_TO_BOOK_RIDE");
+  }
+
+  return response.json();
+}

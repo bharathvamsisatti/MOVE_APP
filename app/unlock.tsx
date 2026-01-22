@@ -7,7 +7,7 @@ export default function Unlock() {
 
   const unlockNow = async () => {
     const ok = await appLock();
-    if (ok) router.replace("/");
+    if (ok) router.replace("/home");
   };
 
   return (

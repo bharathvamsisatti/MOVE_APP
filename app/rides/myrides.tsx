@@ -22,10 +22,18 @@ type Booking = {
   finalPrice?: number;
   bookTime?: string;
   status: "CONFIRMED" | "CANCELLED" | string;
+
   ride?: {
     id: number;
+
+    // ✅ correct keys from backend Ride entity
+    departureLocation?: string;
+    destinationLocation?: string;
+
+    // (optional fallback if your backend still returns these)
     departure?: string;
     destination?: string;
+
     departureDate?: string;
     departureTime?: string;
     pricePerSeat?: number;
@@ -95,8 +103,12 @@ export default function MyRides() {
   const TicketCard = ({ item }: { item: Booking }) => {
     const ride = item?.ride;
 
-    const from = ride?.departure || "Departure";
-    const to = ride?.destination || "Destination";
+    // ✅ FIXED: correct keys
+    const from =
+      ride?.departureLocation || ride?.departure || "Departure";
+
+    const to =
+      ride?.destinationLocation || ride?.destination || "Destination";
 
     const chip = getStatusChip(item?.status);
 
@@ -150,10 +162,7 @@ export default function MyRides() {
           <View style={styles.infoItem}>
             <Ionicons name="call-outline" size={18} color="#333" />
             <Text style={styles.infoText}>
-              Phone:{" "}
-              <Text style={styles.bold}>
-                {item.phoneNumber || "-"}
-              </Text>
+              Phone: <Text style={styles.bold}>{item.phoneNumber || "-"}</Text>
             </Text>
           </View>
         </View>

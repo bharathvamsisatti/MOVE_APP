@@ -22,8 +22,13 @@ type Booking = {
   status: "CONFIRMED" | "CANCELLED" | string;
   ride?: {
     id: number;
+
+    // backend can send any of these (we support all)
     departure?: string;
     destination?: string;
+    departureLocation?: string;
+    destinationLocation?: string;
+
     departureDate?: string;
     departureTime?: string;
     pricePerSeat?: number;
@@ -95,6 +100,21 @@ export default function BookingDetails() {
 
   const ride = booking.ride;
 
+  // ✅ FIX: support all possible keys for From/To
+  const from =
+    ride?.departureLocation ||
+    ride?.departure ||
+    (booking as any)?.departureLocation ||
+    (booking as any)?.departure ||
+    "-";
+
+  const to =
+    ride?.destinationLocation ||
+    ride?.destination ||
+    (booking as any)?.destinationLocation ||
+    (booking as any)?.destination ||
+    "-";
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
       {/* Header */}
@@ -127,7 +147,7 @@ export default function BookingDetails() {
             <View style={styles.dot} />
             <View style={{ flex: 1 }}>
               <Text style={styles.routeLabel}>From</Text>
-              <Text style={styles.routeValue}>{ride?.departure || "-"}</Text>
+              <Text style={styles.routeValue}>{from}</Text>
             </View>
           </View>
 
@@ -137,7 +157,7 @@ export default function BookingDetails() {
             <View style={[styles.dot, { backgroundColor: "#111" }]} />
             <View style={{ flex: 1 }}>
               <Text style={styles.routeLabel}>To</Text>
-              <Text style={styles.routeValue}>{ride?.destination || "-"}</Text>
+              <Text style={styles.routeValue}>{to}</Text>
             </View>
           </View>
         </View>

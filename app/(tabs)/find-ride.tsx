@@ -17,6 +17,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { searchRides } from "../../services/rides";
 import { useAuth } from "../../context/AuthContext";
+import * as Location from "expo-location";
 
 /**
  * Helper: format "HH:mm" or "HH:mm:ss" to "h:mm AM/PM"
@@ -146,6 +147,52 @@ export default function FindRide() {
     }
   };
   /* ---------------------------------------------------- */
+
+  /* ---------- Use current location to fill From field (CITY only) + loader ---------- */
+  const useCurrentLocationForFrom = async () => {
+    try {
+      setGeoLoading(true);
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission denied", "Allow location access to use this feature.");
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const { latitude, longitude } = loc.coords;
+
+      const addresses = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      if (Array.isArray(addresses) && addresses.length > 0) {
+        const a = addresses[0];
+
+        // ✅ Only City (no state)
+        const city =
+          a.city || a.subregion || a.district || "Current Location";
+
+        setFrom(normalizeInput(city));
+      } else {
+        setFrom("Current Location");
+      }
+
+      setFromSuggestions([]);
+      setFromFocused(false);
+      Keyboard.dismiss();
+    } catch (e) {
+      console.log("Location error:", e);
+      Alert.alert("Error", "Unable to fetch current location.");
+    } finally {
+      setGeoLoading(false);
+    }
+  };
+  /* --------------------------------------------------------------------------- */
 
   /* ---------- FIXED onSearch: normalize inputs, prevent empty calls, guard loading ---------- */
   const onSearch = async () => {
@@ -304,6 +351,19 @@ export default function FindRide() {
                 }}
                 style={styles.input}
               />
+
+              {/* Location icon button with loader */}
+              <Pressable
+                onPress={useCurrentLocationForFrom}
+                disabled={geoLoading}
+                style={[styles.locBtn, geoLoading && { opacity: 0.6 }]}
+              >
+                {geoLoading ? (
+                  <ActivityIndicator size="small" />
+                ) : (
+                  <Ionicons name="locate" size={18} color="#1E40AF" />
+                )}
+              </Pressable>
             </View>
 
             {/* FROM suggestions (only when input focused) */}
@@ -811,6 +871,16 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#F3F4F6",
+  },
+
+  // small location button beside input
+  locBtn: {
+    marginLeft: 8,
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   // Filter button

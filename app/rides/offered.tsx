@@ -334,7 +334,7 @@ export default function MyOfferedRides() {
                       <View style={styles.confirmedPill}>
                         <Ionicons name="checkmark-circle" size={14} color="#0F7A3A" />
                         <Text style={styles.confirmedText} numberOfLines={1}>
-                          CONFIRMED
+                          COMPLETED
                         </Text>
                       </View>
                     ) : (

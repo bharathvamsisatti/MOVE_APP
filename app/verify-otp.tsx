@@ -26,7 +26,7 @@ export default function VerifyOtp() {
       setError("");
       const token = await verifyOtpService({ email, otp });
       await login(token, { email });
-      router.replace("/");
+      router.replace("/(tabs)/home");
     } catch (e: any) {
       if (e.message?.includes("expired")) setError("OTP expired. Please resend.");
       else setError("Invalid OTP");
