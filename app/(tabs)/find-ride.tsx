@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,10 +14,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { searchRides } from "../../services/rides";
 import { useAuth } from "../../context/AuthContext";
-import RideDetailsModal from "../../components/RideDetailsModal";
 
 /**
  * Helper: format "HH:mm" or "HH:mm:ss" to "h:mm AM/PM"
@@ -62,6 +61,7 @@ type SortType =
   | "SEATS";
 
 export default function FindRide() {
+  const router = useRouter();
   const { token } = useAuth();
   const { from: fromParam, to: toParam } = useLocalSearchParams();
 
@@ -75,6 +75,10 @@ export default function FindRide() {
   const [toSuggestions, setToSuggestions] = useState<any[]>([]);
   const [geoLoading, setGeoLoading] = useState(false);
 
+  // NEW: focus states to control showing suggestions
+  const [fromFocused, setFromFocused] = useState(false);
+  const [toFocused, setToFocused] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -82,9 +86,6 @@ export default function FindRide() {
   // Sorting + filter modal state
   const [sortBy, setSortBy] = useState<SortType>("PRICE_LOW");
   const [showFilter, setShowFilter] = useState(false);
-
-  // Selected ride for bottom-sheet modal (uses component)
-  const [selectedRide, setSelectedRide] = useState<any | null>(null);
 
   // MOVE Pick logic (frontend-only scoring)
   const getMovePick = (rides: any[]) => {
@@ -172,6 +173,8 @@ export default function FindRide() {
       // CLOSE suggestions to avoid overlap with results
       setFromSuggestions([]);
       setToSuggestions([]);
+      setFromFocused(false);
+      setToFocused(false);
 
       setLoading(true);
       setHasSearched(true);
@@ -215,8 +218,16 @@ export default function FindRide() {
   };
   /* --------------------------------------------------------------------------- */
 
-  // NOTE: removed the keyboardDidHide listener that used to clear suggestions.
-  // Clearing suggestions is handled explicitly when the user taps results / searches.
+  // Hide suggestions when keyboard is dismissed (tap outside / done)
+  useEffect(() => {
+    const sub = Keyboard.addListener("keyboardDidHide", () => {
+      setFromFocused(false);
+      setToFocused(false);
+      setFromSuggestions([]);
+      setToSuggestions([]);
+    });
+    return () => sub.remove();
+  }, []);
 
   // Sorting derived results but keep MOVE Pick on top
   const sortedResults = [...results].sort((a, b) => {
@@ -273,28 +284,39 @@ export default function FindRide() {
                 placeholder="From"
                 placeholderTextColor="#9CA3AF"
                 value={from}
+                onFocus={() => setFromFocused(true)}
+                onBlur={() => {
+                  setFromFocused(false);
+                  setFrom(normalizeInput(from));
+                  setFromSuggestions([]);
+                }}
                 onChangeText={(text) => {
                   setFrom(text);
+                  setFromFocused(true);
+
+                  // avoid calling fetcher for tiny queries
+                  if (normalizeInput(text).length < 3) {
+                    setFromSuggestions([]);
+                    return;
+                  }
+
                   fetchSuggestions(text, "FROM");
                 }}
-                onBlur={() => setFrom(normalizeInput(from))} // optional polish: auto-trim on blur
                 style={styles.input}
               />
             </View>
 
-            {/* FROM suggestions */}
-            {fromSuggestions.length > 0 && (
+            {/* FROM suggestions (only when input focused) */}
+            {fromFocused && fromSuggestions.length > 0 && (
               <View style={styles.suggestionsBox}>
                 {fromSuggestions.map((item) => (
                   <Pressable
                     key={item.place_id}
                     onPress={() => {
-                      // apply state first, then dismiss keyboard to avoid race with keyboardDidHide
                       setFrom(normalizeInput(item.display_name));
                       setFromSuggestions([]);
-
-                      // dismiss after state update/render
-                      requestAnimationFrame(() => Keyboard.dismiss());
+                      setFromFocused(false);
+                      Keyboard.dismiss();
                     }}
                     style={styles.suggestionItem}
                   >
@@ -313,17 +335,29 @@ export default function FindRide() {
                 placeholderTextColor="#9CA3AF"
                 placeholder="To"
                 value={to}
+                onFocus={() => setToFocused(true)}
+                onBlur={() => {
+                  setToFocused(false);
+                  setTo(normalizeInput(to));
+                  setToSuggestions([]);
+                }}
                 onChangeText={(text) => {
                   setTo(text);
+                  setToFocused(true);
+
+                  if (normalizeInput(text).length < 3) {
+                    setToSuggestions([]);
+                    return;
+                  }
+
                   fetchSuggestions(text, "TO");
                 }}
-                onBlur={() => setTo(normalizeInput(to))} // optional polish: auto-trim on blur
                 style={styles.input}
               />
             </View>
 
-            {/* TO suggestions */}
-            {toSuggestions.length > 0 && (
+            {/* TO suggestions (only when input focused) */}
+            {toFocused && toSuggestions.length > 0 && (
               <View style={styles.suggestionsBox}>
                 {toSuggestions.map((item) => (
                   <Pressable
@@ -331,8 +365,8 @@ export default function FindRide() {
                     onPress={() => {
                       setTo(normalizeInput(item.display_name));
                       setToSuggestions([]);
-
-                      requestAnimationFrame(() => Keyboard.dismiss());
+                      setToFocused(false);
+                      Keyboard.dismiss();
                     }}
                     style={styles.suggestionItem}
                   >
@@ -516,12 +550,12 @@ export default function FindRide() {
                 </View>
               </View>
 
-              {/* CTA - opens RideDetailsModal */}
+              {/* CTA - navigate to ride details route */}
               <Pressable
                 style={styles.viewBtn}
-                onPress={() => setSelectedRide(r)}
+                onPress={() => router.push(`/rides/${r.id}`)}
               >
-                <Text style={styles.viewText}>View ride</Text>
+                <Text style={styles.viewText}>Book Ride</Text>
               </Pressable>
             </View>
           );
@@ -578,14 +612,6 @@ export default function FindRide() {
           </View>
         </View>
       </Modal>
-
-      {/* RIDE DETAILS MODAL COMPONENT */}
-      {selectedRide && (
-        <RideDetailsModal
-          ride={selectedRide}
-          onClose={() => setSelectedRide(null)}
-        />
-      )}
     </SafeAreaView>
   );
 }
@@ -610,6 +636,8 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 18,
     elevation: 6,
+    position: "relative", // ensure suggestions absolute inside this container behave correctly
+    zIndex: 10,
   },
 
   titleRow: {
@@ -776,6 +804,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
     maxHeight: 200,
+    elevation: 10, // ensure it appears above other cards on Android
+    overflow: "hidden",
   },
   suggestionItem: {
     padding: 12,
