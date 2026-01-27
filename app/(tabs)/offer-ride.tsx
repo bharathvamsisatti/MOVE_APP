@@ -386,8 +386,7 @@ export default function OfferRide() {
             // Clear saved draft only AFTER success
             await AsyncStorage.removeItem(OFFER_RIDE_DRAFT_KEY).catch(() => {});
 
-            setShowConfirmModal(false);
-            Alert.alert("Success", "Ride published successfully 🚗");
+            setShowConfirmModal(false);  
             router.replace("/thankyou");
           } catch (e: any) {
             Alert.alert("Publish failed", e.message || "Something went wrong");
@@ -1074,8 +1073,8 @@ function ScheduleStep({
 
       {/* Seats */}
       <TextInput
-        autoFocus
         placeholder="Total seats"
+        placeholderTextColor="#9CA3AF"
         keyboardType="number-pad"
         value={totalSeats === "" ? "" : String(totalSeats)}
         onChangeText={(v) => {
@@ -1098,6 +1097,7 @@ function ScheduleStep({
 
       <TextInput
         placeholder="Available seats (exclude driver)"
+        placeholderTextColor="#9CA3AF"
         keyboardType="number-pad"
         value={availableSeats === "" ? "" : String(availableSeats)}
         onChangeText={(v) => {
@@ -1116,6 +1116,7 @@ function ScheduleStep({
       {/* Price */}
       <TextInput
         placeholder="Price per seat (₹)"
+        placeholderTextColor="#9CA3AF"
         keyboardType="number-pad"
         value={pricePerSeat === "" ? "" : String(pricePerSeat)}
         onChangeText={(v) => {
@@ -1190,13 +1191,18 @@ function ScheduleStep({
             setShowTimePicker(false);
             if (!selectedTime) return;
 
-            // Prevent past time if date = today
+            // ✅ FIX: Compare only HH:MM if date is today
             if (isToday(rideDate)) {
               const now = new Date();
-              if (selectedTime < now) {
+
+              const nowMinutes = now.getHours() * 60 + now.getMinutes();
+              const selectedMinutes =
+                selectedTime.getHours() * 60 + selectedTime.getMinutes();
+
+              if (selectedMinutes <= nowMinutes) {
                 Alert.alert(
                   "Invalid time",
-                  "Please select a future time for today."
+                  "Please select a future time (after current time)."
                 );
                 return;
               }
@@ -1393,6 +1399,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     marginBottom: 14,
+    color: "#111827", // ✅ IMPORTANT (text visible)
+  backgroundColor: "#fff", // ✅ ensures placeholder contrast
   },
 
   phoneRow: {

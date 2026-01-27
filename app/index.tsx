@@ -2,20 +2,23 @@ import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { appLock } from "../utils/BiometricAuth";
+import Splash from "./splash"; // ✅ import your splash component
 
 export default function Index() {
-  const auth = useAuth();              // ⬅ full auth object
+  const auth = useAuth();
   const [unlocked, setUnlocked] = useState<boolean | null>(null);
 
   useEffect(() => {
     (async () => {
-      const ok = await appLock();      // 🔐 fingerprint / PIN
+      const ok = await appLock();
       setUnlocked(ok);
     })();
   }, []);
 
-  // Wait until auth context is ready
-  if (!auth || auth.loading || unlocked === null) return null;
+  // ✅ show splash while waiting
+  if (!auth || auth.loading || unlocked === null) {
+    return <Splash />;
+  }
 
   if (!unlocked) return <Redirect href="/unlock" />;
 

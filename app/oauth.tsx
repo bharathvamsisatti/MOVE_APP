@@ -9,16 +9,8 @@ export default function OAuthCallback() {
   const { login } = useAuth();
 
   useEffect(() => {
-    const handleOAuth = async () => {
+    const handleUrl = async (url: string) => {
       try {
-        // Parse deep link URL
-        const url = await Linking.getInitialURL();
-
-        if (!url) {
-          router.replace("/login");
-          return;
-        }
-
         const parsed = Linking.parse(url);
         const token = parsed.queryParams?.token as string | undefined;
 
@@ -27,17 +19,26 @@ export default function OAuthCallback() {
           return;
         }
 
-        // Save token (OAuth = auto-login)
         await login(token, { provider: "GOOGLE" });
 
-        // Go through index gate
+        // go through auth gate
         router.replace("/");
       } catch (e) {
         router.replace("/login");
       }
     };
 
-    handleOAuth();
+    // ✅ 1) when app opens from cold start
+    Linking.getInitialURL().then((url) => {
+      if (url) handleUrl(url);
+    });
+
+    // ✅ 2) when app is already open (MOST IMPORTANT)
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      handleUrl(url);
+    });
+
+    return () => sub.remove();
   }, []);
 
   return (

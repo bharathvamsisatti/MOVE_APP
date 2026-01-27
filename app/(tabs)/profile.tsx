@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,14 +9,23 @@ import {
   Linking,
   StatusBar,
   Platform,
+  Image,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
 import { useRouter } from "expo-router";
+import { userService, MeResponse } from "../../services/user";
+import { API_BASE_URL } from "../../config/api";
 
 export default function Profile() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const router = useRouter();
+
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // ✅ Put your official MOVE social links here
   const MOVE_SOCIALS = {
@@ -25,7 +34,48 @@ export default function Profile() {
     twitter: "https://twitter.com/",
   };
 
-  const openUrl = async (url) => {
+  const getProfileImageUrl = (path?: string | null) => {
+    if (!path) return null;
+    if (path.startsWith("http")) return path;
+    if (path.startsWith("/")) return `${API_BASE_URL}${path}`;
+    return `${API_BASE_URL}/${path}`;
+  };
+
+  const profileImageUri = getProfileImageUrl(me?.profileImage);
+
+  const loadMe = async () => {
+    const data = await userService.getMe();
+    setMe(data);
+  };
+
+  const fetchMe = async () => {
+    try {
+      setLoading(true);
+      await loadMe();
+    } catch (e: any) {
+      console.log("PROFILE LOAD ERROR:", e?.response?.data || e?.message);
+      Alert.alert("Error", "Failed to load profile");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMe();
+  }, []);
+
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await loadMe();
+    } catch (e: any) {
+      Alert.alert("Error", "Failed to refresh profile");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const openUrl = async (url: string) => {
     try {
       const supported = await Linking.canOpenURL(url);
       if (!supported) {
@@ -52,7 +102,17 @@ export default function Profile() {
     ]);
   };
 
-  const MenuItem = ({ title, icon, onPress, danger = false }) => {
+  const MenuItem = ({
+    title,
+    icon,
+    onPress,
+    danger = false,
+  }: {
+    title: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    onPress: () => void;
+    danger?: boolean;
+  }) => {
     return (
       <Pressable
         onPress={onPress}
@@ -84,6 +144,9 @@ export default function Profile() {
       style={styles.screen}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
     >
       {/* Small gap from status bar */}
       <View style={styles.topGap} />
@@ -94,22 +157,39 @@ export default function Profile() {
       {/* Profile Card */}
       <View style={styles.profileCard}>
         <View style={styles.avatar}>
-          <Ionicons name="person" size={30} color="#555" />
+          {loading ? (
+            <ActivityIndicator />
+          ) : profileImageUri ? (
+            <Image source={{ uri: profileImageUri }} style={styles.avatarImg} />
+          ) : (
+            <Ionicons name="person" size={30} color="#555" />
+          )}
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text style={styles.nameText}>{user?.name || "MOVE User"}</Text>
-          <Text style={styles.emailText}>{user?.email || "No email"}</Text>
+          <Text style={styles.nameText}>
+            {me?.name?.trim() ? me.name : "MOVE USER"}
+          </Text>
+
+          <Text style={styles.emailText}>
+            {me?.email?.trim() ? me.email : "No email"}
+          </Text>
 
           <View style={styles.badgesRow}>
             <View style={styles.badge}>
-              <Ionicons name="star" size={14} color="#F5A623" />
-              <Text style={styles.badgeText}>4.7</Text>
+              <Ionicons name="checkmark-circle" size={14} color="#2E7D32" />
+              <Text style={styles.badgeText}>
+                {me?.verified ? "Verified" : "Not Verified"}
+              </Text>
             </View>
 
             <View style={styles.badge}>
-              <Ionicons name="checkmark-circle" size={14} color="#2E7D32" />
-              <Text style={styles.badgeText}>Verified</Text>
+              <Ionicons
+                name={me?.provider === "GOOGLE" ? "logo-google" : "shield"}
+                size={14}
+                color="#1976D2"
+              />
+              <Text style={styles.badgeText}>{me?.provider || "LOCAL"}</Text>
             </View>
           </View>
         </View>
@@ -126,7 +206,7 @@ export default function Profile() {
       {/* Menu Tabs */}
       <View style={styles.menuBox}>
         <MenuItem
-          title="Profile"
+          title="Profile Details"
           icon="person-outline"
           onPress={() => router.push("/profile/details")}
         />
@@ -213,18 +293,9 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#F7F7F7",
-  },
+  screen: { flex: 1, backgroundColor: "#F7F7F7" },
+  container: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 25 },
 
-  container: {
-    flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingBottom: 25,
-  },
-
-  // small gap between status bar and title
   topGap: {
     height: Platform.OS === "android" ? (StatusBar.currentHeight || 10) : 10,
   },
@@ -255,25 +326,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+    overflow: "hidden",
   },
 
-  nameText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111",
+  avatarImg: {
+    height: 55,
+    width: 55,
+    borderRadius: 27.5,
   },
 
-  emailText: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: 2,
-  },
+  nameText: { fontSize: 16, fontWeight: "700", color: "#111" },
+  emailText: { fontSize: 13, color: "#666", marginTop: 2 },
 
-  badgesRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 8,
-  },
+  badgesRow: { flexDirection: "row", gap: 10, marginTop: 8 },
 
   badge: {
     flexDirection: "row",
@@ -285,24 +350,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
 
-  badgeText: {
-    fontSize: 12,
-    color: "#333",
-    fontWeight: "600",
-  },
+  badgeText: { fontSize: 12, color: "#333", fontWeight: "600" },
 
-  editBtn: {
-    padding: 8,
-    borderRadius: 10,
-    backgroundColor: "#F2F2F2",
-  },
+  editBtn: { padding: 8, borderRadius: 10, backgroundColor: "#F2F2F2" },
 
-  menuBox: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    overflow: "hidden",
-    elevation: 2,
-  },
+  menuBox: { backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", elevation: 2 },
 
   menuItem: {
     paddingVertical: 14,
@@ -314,17 +366,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  menuLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
+  menuLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
 
-  menuText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#222",
-  },
+  menuText: { fontSize: 15, fontWeight: "600", color: "#222" },
 
   socialBox: {
     backgroundColor: "#fff",
@@ -334,17 +378,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  socialTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#111",
-    marginBottom: 10,
-  },
+  socialTitle: { fontSize: 14, fontWeight: "700", color: "#111", marginBottom: 10 },
 
-  socialRow: {
-    flexDirection: "row",
-    gap: 14,
-  },
+  socialRow: { flexDirection: "row", gap: 14 },
 
   socialBtn: {
     height: 44,
@@ -355,22 +391,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  logoutBox: {
-    marginTop: 14,
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    overflow: "hidden",
-    elevation: 2,
-  },
+  logoutBox: { marginTop: 14, backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", elevation: 2 },
 
-  footer: {
-    marginTop: 18,
-    alignItems: "center",
-  },
-
-  footerText: {
-    fontSize: 12,
-    color: "#888",
-    marginTop: 4,
-  },
+  footer: { marginTop: 18, alignItems: "center" },
+  footerText: { fontSize: 12, color: "#888", marginTop: 4 },
 });

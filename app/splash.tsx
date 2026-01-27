@@ -1,22 +1,8 @@
-import { SafeAreaView, View, Text, } from "react-native";
-import { useEffect } from "react";
-import { useRouter } from "expo-router";
-import LottieView from "lottie-react-native";
 import React from "react";
-
+import { SafeAreaView, View, Text } from "react-native";
+import LottieView from "lottie-react-native";
 
 export default function Splash() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      router.replace("/");
-
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       <View
@@ -30,7 +16,7 @@ export default function Splash() {
         <LottieView
           source={require("../assets/lottie/Car safety edit.json")}
           autoPlay
-          loop={false}
+          loop
           style={{
             width: 220,
             height: 220,
@@ -44,7 +30,7 @@ export default function Splash() {
             fontSize: 36,
             fontWeight: "700",
             letterSpacing: 2,
-            color: "#1E40AF", // primary color
+            color: "#1E40AF",
           }}
         >
           MOVE

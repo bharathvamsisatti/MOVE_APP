@@ -50,6 +50,20 @@ const parseDepartureToDate = (time?: string) => {
   return d;
 };
 
+/* ---------- New helpers for TODAY filtering ---------- */
+const isSameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+const timeToMinutes = (time?: string) => {
+  if (!time) return null;
+  const [hh, mm] = time.split(":").map(Number);
+  if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+  return hh * 60 + mm;
+};
+/* ----------------------------------------------------- */
+
 /* ---------- New shared normalizer (add near helpers) ---------- */
 const normalizeInput = (text: string) => text.trim().replace(/\s+/g, " ");
 /* -------------------------------------------------------------- */
@@ -238,7 +252,19 @@ export default function FindRide() {
         date,
         token,
       });
-      const data = Array.isArray(apiResponse) ? apiResponse : apiResponse || [];
+      let data = Array.isArray(apiResponse) ? apiResponse : apiResponse || [];
+
+      // FRONTEND: if searching for TODAY, filter out rides departing at or before now
+      if (isSameDay(date, new Date())) {
+        const now = new Date();
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+
+        data = data.filter((r: any) => {
+          const depMin = timeToMinutes(r.departureTime);
+          if (depMin === null) return true; // if time missing, keep it
+          return depMin > nowMin; // only future rides (strictly after current time)
+        });
+      }
 
       const bestRide = getMovePick(data);
 

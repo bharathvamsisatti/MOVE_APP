@@ -308,9 +308,7 @@ export default function MyOfferedRides() {
 
                 <View style={styles.dottedDivider} />
 
-                {/* ✅ FIXED BOTTOM LAYOUT */}
                 <View style={styles.bottomRow}>
-                  {/* left stats fixed width */}
                   <View style={styles.leftStats}>
                     <View style={styles.statBox}>
                       <Text style={styles.statLabel}>Seats</Text>
@@ -323,10 +321,27 @@ export default function MyOfferedRides() {
                     </View>
                   </View>
 
-                  {/* right actions take only needed space */}
                   <View style={styles.actionsRow}>
-                    <Pressable style={styles.detailsBtnSmall} onPress={() => openDetails(ride)}>
-                      <Ionicons name="eye-outline" size={0.2} color="#111" />
+                    {/* ✅ NEW: Ticket button */}
+                    <Pressable
+                      style={styles.ticketBtnSmall}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/offered/ticket",
+                          params: { rideId: String(ride.id) },
+                        })
+                      }
+                    >
+                      <Ionicons name="ticket-outline" size={14} color="#111" />
+                      <Text style={styles.ticketTextSmall}>Ticket</Text>
+                    </Pressable>
+
+                    {/* Details */}
+                    <Pressable
+                      style={styles.detailsBtnSmall}
+                      onPress={() => openDetails(ride)}
+                    >
+                      <Ionicons name="eye-outline" size={14} color="#111" />
                       <Text style={styles.detailsTextSmall}>Details</Text>
                     </Pressable>
 
@@ -517,7 +532,6 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
 
-  // ✅ fixed stats width so price never hides
   leftStats: {
     flexDirection: "row",
     gap: 18,
@@ -536,7 +550,21 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
 
-  // ✅ smaller details so it won't overlap price
+  ticketBtnSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#E5E7EB",
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  ticketTextSmall: {
+    fontWeight: "900",
+    color: "#111",
+    fontSize: 12,
+  },
+
   detailsBtnSmall: {
     flexDirection: "row",
     alignItems: "center",

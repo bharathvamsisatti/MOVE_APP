@@ -1,6 +1,13 @@
-import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Keyboard,
+} from "react-native";
 import { useRouter } from "expo-router";
-import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { registerUser } from "../services/auth";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,23 +20,48 @@ WebBrowser.maybeCompleteAuthSession();
 // 🔴 CHANGE ONLY IF BACKEND URL CHANGES
 const BACKEND_URL = "https://dev-moveservices.mroads.com";
 
+const EMAIL_DOMAINS = ["gmail.com", "outlook.com", "yahoo.com"];
+
 export default function Register() {
   const router = useRouter();
 
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
+  const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const passwordMismatch =
+    confirmPassword.length > 0 && password !== confirmPassword;
+
   const isValid =
     userName.length >= 2 &&
     email.includes("@") &&
+    email.includes(".") &&
     password.length >= 6 &&
     password === confirmPassword;
+
+  // ---- Email suggestion logic ----
+  const emailHasAt = email.includes("@");
+  const [emailNamePart, emailDomainPart] = email.split("@");
+
+  const shouldSuggestDomains =
+    showEmailSuggestions &&
+    emailHasAt &&
+    emailNamePart?.length > 0 &&
+    (!emailDomainPart || !emailDomainPart.includes(".")); // suggest until domain completed
+
+  const filteredDomains = EMAIL_DOMAINS.filter((d) =>
+    (emailDomainPart || "").length === 0
+      ? true
+      : d.startsWith(emailDomainPart.toLowerCase())
+  );
 
   /* =========================
      EMAIL / PASSWORD REGISTER
@@ -38,6 +70,11 @@ export default function Register() {
     try {
       setLoading(true);
       setError("");
+
+      if (passwordMismatch) {
+        setError("Passwords do not match");
+        return;
+      }
 
       await registerUser({ userName, email, password });
 
@@ -69,17 +106,19 @@ export default function Register() {
 
       await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
-      // ✅ Backend handles:
-      // - existing user → login
-      // - new user → create + login
-      // Token handling happens in /oauth screen
-
       setSuccess(
         "No account found with this email. We’ve created one for you and signed you in."
       );
     } catch (e) {
       setError("Google signup failed. Please try again.");
     }
+  };
+
+  const applyEmailSuggestion = (domain: string) => {
+    if (!emailNamePart) return;
+    setEmail(`${emailNamePart}@${domain}`);
+    setShowEmailSuggestions(false);
+    Keyboard.dismiss();
   };
 
   return (
@@ -94,7 +133,7 @@ export default function Register() {
           Join MOVE and start traveling smarter
         </Text>
 
-        {/* -------- Email Signup -------- */}
+        {/* -------- Full Name -------- */}
         <TextInput
           placeholder="Full name"
           placeholderTextColor="#9CA3AF"
@@ -103,15 +142,49 @@ export default function Register() {
           onChangeText={setUserName}
         />
 
+        {/* -------- Email -------- */}
         <TextInput
           placeholder="Email"
           placeholderTextColor="#9CA3AF"
           style={styles.input}
           value={email}
-          onChangeText={setEmail}
+          onFocus={() => setShowEmailSuggestions(true)}
+          onBlur={() => {
+            // small delay so press on suggestion still works
+            setTimeout(() => setShowEmailSuggestions(false), 150);
+          }}
+          onChangeText={(text) => {
+            setEmail(text);
+            setShowEmailSuggestions(true);
+          }}
           autoCapitalize="none"
+          keyboardType="email-address"
         />
 
+        {/* Email suggestions */}
+        {shouldSuggestDomains && filteredDomains.length > 0 && (
+          <View style={styles.suggestionsBox}>
+            {filteredDomains.map((domain) => (
+              <Pressable
+                key={domain}
+                style={styles.suggestionItem}
+                onPress={() => applyEmailSuggestion(domain)}
+              >
+                <Ionicons
+                  name="mail-outline"
+                  size={18}
+                  color="#1E40AF"
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={styles.suggestionText}>
+                  {emailNamePart}@{domain}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* -------- Password -------- */}
         <View style={styles.passwordWrapper}>
           <TextInput
             placeholder="Password"
@@ -130,6 +203,7 @@ export default function Register() {
           </Pressable>
         </View>
 
+        {/* -------- Confirm Password -------- */}
         <TextInput
           placeholder="Confirm password"
           placeholderTextColor="#9CA3AF"
@@ -138,6 +212,11 @@ export default function Register() {
           value={confirmPassword}
           onChangeText={setConfirmPassword}
         />
+
+        {/* Password mismatch message */}
+        {passwordMismatch ? (
+          <Text style={styles.error}>Passwords do not match</Text>
+        ) : null}
 
         {/* -------- Messages -------- */}
         {success ? <Text style={styles.success}>{success}</Text> : null}
@@ -173,8 +252,7 @@ export default function Register() {
         {/* -------- Footer -------- */}
         <Pressable onPress={() => router.back()}>
           <Text style={styles.footerText}>
-            Already have an account?{" "}
-            <Text style={styles.link}>Login</Text>
+            Already have an account? <Text style={styles.link}>Login</Text>
           </Text>
         </Pressable>
       </View>
@@ -220,6 +298,31 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
 
+  // Email suggestions dropdown
+  suggestionsBox: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    marginTop: -8,
+    marginBottom: 14,
+    overflow: "hidden",
+  },
+
+  suggestionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+
+  suggestionText: {
+    color: "#1E40AF",
+    fontWeight: "700",
+  },
+
   passwordWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -246,6 +349,7 @@ const styles = StyleSheet.create({
   error: {
     color: "#DC2626",
     marginBottom: 10,
+    fontWeight: "600",
   },
 
   primaryBtn: {
